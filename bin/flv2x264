@@ -11,23 +11,23 @@ USAGE:
   flv2x264 [OPTIONS] -i file.flv -o file.mkv
 
 OPTIONS:
-  -V    Video codec: h264, xvid, vp8, copy
+  -V    Video codec: h264, mpeg4 (xvid), vp8, theora, copy
   -v    Video quality: 0-9 (bigger is better)
-  -A    Audio codec: aac, mp3, ogg, copy
+  -A    Audio codec: aac, mp3, vorbis, copy
   -a    Audio quality: 0-9 (bigger is better)
   -f    Overwrite video filters, default is hqdn3d
   -F    Overwrite audio filters, empty by default
   -L    Show list of all available filters
   -h    This screen
 
-DEFAULTS:
+DEFAULTS FOR OUTPUT EXT:
   avi   Audio: mp3 [1];    video: xvid [1]
   mp4   Audio: aac [1];    Video: h264 [1]
   mkv   Audio: aac [1];    Video: h264 [1]
   webm  Audio: vorbis [1]; Video: vp8 [1]
-  ogm   Audio: vorbis [1]; Video: Theora [1]
+  ogm   Audio: vorbis [1]; Video: theora [1]
 
-[1] - "or copy"
+[1] - "or copy" when input and output match
 EOF
   exit 1
 }
