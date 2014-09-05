@@ -1,7 +1,7 @@
 #!/bin/bash
 VERBOSITY="${VERBOSITY:-"-loglevel warning -hide_banner -stats"}"
-ARGAC=
-ARGVC=
+LockAC=
+LockVC=
 
 usage() {
   cat <<EOF
@@ -44,7 +44,6 @@ while getopts "i:o:a:A:v:V:f:F:hL" OPT; do
         exit 1
       fi
       ;;
-    A) AC="$OPTARG"; ARGAC=1;;
     v)
       if [ -n "$OPTARG" ] && [ -z "${OPTARG//[0-9]/}" ] && [ "${#OPTARG}" = "1" ]; then
         VQ="$OPTARG"
@@ -53,23 +52,10 @@ while getopts "i:o:a:A:v:V:f:F:hL" OPT; do
         exit 1
       fi
       ;;
-    V) VC="$OPTARG"; ARGVC=1;;
-    f)
-      if [ -n "$OPTARG" ]; then
-        VF="$OPTARG"
-      else
-        echo "Error: Options -f is empty..." >&2
-        exit 1
-      fi
-      ;;
-    F)
-      if [ -n "$OPTARG" ]; then
-        AF="$OPTARG"
-      else
-        echo "Error: Options -F is empty..." >&2
-        exit 1
-      fi
-      ;;
+    A) AC="$OPTARG"; LockAC=1;;
+    V) VC="$OPTARG"; LockVC=1;;
+    f) VF="$OPTARG";;
+    F) AF="$OPTARG";;
     L) ffmpeg -filters help -loglevel warning -hide_banner -stats; exit 1;;
     i) 
       if [ -n "$OPTARG" ] && [ -f "$OPTARG" ]; then
@@ -96,37 +82,37 @@ while getopts "i:o:a:A:v:V:f:F:hL" OPT; do
   esac
 done
 
-test -n "$VF" && VF=" -filter:v $VF"
-test -n "$AF" && AF=" -filter:a $AF"
-
 case "$OFMT" in
-  avi) AC="${AC:-"mp3"}"; VC="${VC:-"mpeg4"}" VF="${VF:-"hqdn3d"}";;
+  avi) AC="${AC:-"mp3"}"; VC="${VC:-"mpeg4"}";;
   mp4|mkv) AC="${AC:-"aac"}"; VC="${VC:-"h264"}";;
   webm) AC="${AC:-"vorbis"}"; VC="${VC:-"vp8"}";;
   ogg|ogm) AC="${AC:-"vorbis"}"; VC="${VC:-"theora"}";;
   *) echo "This container is not implemented. Use ffmpeg directly insead..."; exit 1;;
 esac
 
+test -n "$VF" && VF=" -filter:v $VF"
+test -n "$AF" && AF=" -filter:a $AF"
+
 while IFS=, read -a csv; do
   test "${csv[0]}" = "stream" || continue
-  test "${csv[2]}" = "video" && test -z "$ARGVC" && test "${csv[1]}" = "$VC" && VC=
-  test "${csv[2]}" = "audio" && test -z "$ARGAC" && test "${csv[1]}" = "$AC" && AC=
+  test "${csv[2]}" = "video" && test -z "$LockVC" && test "${csv[1]}" = "$VC" && VC=
+  test "${csv[2]}" = "audio" && test -z "$LockAC" && test "${csv[1]}" = "$AC" && AC=
 done < <(ffprobe -v 0 -print_format csv -show_entries stream=codec_name,codec_type -- "$IFILE")
 
 case "$VC" in
   h264) VC="-c:v libx264 -trellis 2 -maxrate $[180000*$[${VQ:-"3"}+1]] -bufsize $[520000/$[${VQ:-"3"}+1]]$VF ";;
-  mpeg4) VC="-c:v mpeg4 -vtag xvid -q:v $[31-$[$[${VQ:-"3"}+1]*3]]$VF ";;
+  mpeg4) VC="-c:v mpeg4 -vtag xvid -qscale:v $[$[10-${VQ:-"7"}]*2] -bf 2$VF ";;
   vp8) VC="-c:v libvpx -quality good -maxrate $[180000*$[${VQ:-"3"}+1]] -bufsize $[520000/$[${VQ:-"3"}+1]]$VF ";;
   theora) VC="-c:v libtheora -q:v $[${VQ:-"3"}+1]$VF ";;
   *) VC=
 esac
 case "$AC" in
-  mp3) test -n "$AQ" && AQ=$[9-AQ]; AC="-c:a libmp3lame -q:a ${AQ:-"4"}$AF ";;
-  vorbis) AC="-c:a libvorbis -q:a $[${AQ:-"3.0"}+1]$AF ";;
-  aac) AC="-c:a aac -q:a $[${AQ:-"3"}+1]$AF ";;
+  mp3) test -n "$AQ" && AQ=$[9-AQ]; AC="-c:a libmp3lame -qscale:a ${AQ:-"4"}$AF ";;
+  vorbis) AC="-c:a libvorbis -qscale:a $[${AQ:-"3.0"}+1]$AF ";;
+  aac) AC="-c:a aac -qscale:a $[${AQ:-"3"}+1]$AF ";;
   *) AC=
 esac
 
 printf -- "Command:\n  %s\n" "ffmpeg -i \"$IFILE\" \"$OFILE\" -c copy $VC$AC$VERBOSITY"
 
-ffmpeg -i "$IFILE" "$OFILE" -c copy $VC$AC$VERBOSITY
+ffmpeg -i "$IFILE" -c copy $VC$AC-f $OFMT "$OFILE" $VERBOSITY
