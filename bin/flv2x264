@@ -12,7 +12,7 @@ USAGE:
 
 OPTIONS:
   -V    Video codec: h264, mpeg4 (xvid), vp8, theora, copy
-  -v    Video quality: 0-9 (bigger is better)
+  -v    Video quality: 0-9 (bigger is better) default: 7
   -A    Audio codec: aac, mp3, vorbis, copy
   -a    Audio quality: 0-9 (bigger is better)
   -f    Overwrite video filters, default is hqdn3d
@@ -100,8 +100,15 @@ while IFS=, read -a csv; do
 done < <(ffprobe -v 0 -print_format csv -show_entries stream=codec_name,codec_type -- "$IFILE")
 
 case "$VC" in
-  h264) VC="-c:v libx264 -trellis 2 -maxrate $[180000*$[${VQ:-"3"}+1]] -bufsize $[520000/$[${VQ:-"3"}+1]]$VF ";;
-  mpeg4) VC="-c:v mpeg4 -vtag xvid -qscale:v $[$[10-${VQ:-"7"}]*2] -bf 2$VF ";;
+  h264)
+    VQ="${VQ:-7}"
+    h264_presets=(ultrafast superfast veryfast veryfast faster faster fast fast medium slow)
+    VC="-c:v libx264 -trellis 2 -preset ${h264_presets[$VQ]} -crf $[$[10-VQ]*2+16] -maxrate $[250*$[VQ+1]+250]k -bufsize $[1000*$[VQ+1]]k$VF "
+    ;;
+  mpeg4)
+    VQ="${VQ:-7}"
+    VC="-c:v mpeg4 -vtag xvid -trellis 2 -qscale:v $[$[10-VQ]*2] -bf 2$VF "
+    ;;
   vp8) VC="-c:v libvpx -quality good -maxrate $[180000*$[${VQ:-"3"}+1]] -bufsize $[520000/$[${VQ:-"3"}+1]]$VF ";;
   theora) VC="-c:v libtheora -q:v $[${VQ:-"3"}+1]$VF ";;
   *) VC=
@@ -109,10 +116,10 @@ esac
 case "$AC" in
   mp3) test -n "$AQ" && AQ=$[9-AQ]; AC="-c:a libmp3lame -qscale:a ${AQ:-"4"}$AF ";;
   vorbis) AC="-c:a libvorbis -qscale:a $[${AQ:-"3.0"}+1]$AF ";;
-  aac) AC="-c:a aac -qscale:a $[${AQ:-"3"}+1]$AF ";;
+  aac) AC="-strict -2 -c:a aac -qscale:a $[${AQ:-"3"}+1]$AF ";;
   *) AC=
 esac
 
-printf -- "Command:\n  %s\n" "ffmpeg -i \"$IFILE\" \"$OFILE\" -c copy $VC$AC$VERBOSITY"
+printf -- "\e[0;48;32;1mCommand:\e[0m\n  %s\n" "ffmpeg -i \"$IFILE\" \"$OFILE\" -c copy $VC$AC$VERBOSITY"
 
-ffmpeg -i "$IFILE" -c copy $VC$AC-f $OFMT "$OFILE" $VERBOSITY
+ffmpeg -i "$IFILE" -c copy $VC$AC"$OFILE" $VERBOSITY
